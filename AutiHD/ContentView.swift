@@ -1,6 +1,5 @@
 //
 //  ContentView.swift
-//  testing
 //
 //  Created by Jacky Ma on 8/3/25.
 //
@@ -8,7 +7,17 @@
 import UserNotifications
 import SwiftUI
 
-class AppDelegate: NSObject, UIApplicationDelegate {
+struct MyApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+    }
+}
+
+class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Request notification permission
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
@@ -18,7 +27,16 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 print("Notification permission granted: \(granted)")
             }
         }
+
+        // Set the notification delegate
+        UNUserNotificationCenter.current().delegate = self
         return true
+    }
+
+    // Handle notification when the app is in the foreground
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        // Show the notification even if the app is in the foreground
+        completionHandler([.banner, .sound]) // Use `.banner` for the updated way to display alerts
     }
 }
 
@@ -72,11 +90,11 @@ struct ContentView: View {
                     isPresentingAddReminder.toggle()
                 }) {
                     Text("Add Reminder")
-                        .frame(maxWidth: .infinity)
+                        .frame(width: 150)
                         .padding()
-                        .background(Color.green)
+                        .background(Color.blue)
                         .foregroundColor(.white)
-                        .cornerRadius(10)
+                        .cornerRadius(100)
                 }
             }
             .sheet(isPresented: $isPresentingAddReminder) {
@@ -178,7 +196,7 @@ struct AddReminderView: View {
                     Text("Save Reminder")
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.green)
+                        .background(Color.blue)
                         .foregroundColor(.white)
                         .cornerRadius(10)
                 }
@@ -220,3 +238,4 @@ struct ContentView_Previews: PreviewProvider {
         ContentView()
     }
 }
+

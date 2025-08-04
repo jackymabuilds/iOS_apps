@@ -177,21 +177,21 @@ struct AddReminderView: View {
                     .padding()
                 
                 // Reminder Time Picker (with date and time when not repeating)
-                if !isRepeating {
-                    VStack(alignment: .leading) {
-                        Text("Set Reminder Date & Time")
-                            .font(.headline)
-                        DatePicker("Select date/time", selection: $reminderTime, displayedComponents: [.date, .hourAndMinute])
-                            .padding()
-                            .disabled(isRepeating)  // Disable the time picker if repeating
-                    }
-                } else {
+                VStack(alignment: .leading) {
+                    Text("Set Reminder Date & Time")
+                        .font(.headline)
+                    DatePicker("Select date and time", selection: $reminderTime, displayedComponents: [.date, .hourAndMinute])
+                        .padding()
+                        .disabled(isRepeating ? false : true)  // Disable if not repeating
+                }
+                
+                if isRepeating {
                     Text("Reminder will repeat every 10 minutes.")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                         .padding(.top, 5)
                 }
-                
+
                 // Save Reminder Button
                 Button(action: {
                     guard !newReminderTitle.isEmpty else { return }
@@ -233,15 +233,40 @@ struct AddReminderView: View {
         content.sound = .default
         
         if reminder.isRepeating {
-            // For repeating reminders, we need to set up a trigger to repeat every 10 minutes
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 600, repeats: true) // 600 seconds = 10 minutes
+            // For repeating reminders, schedule the first notification at the chosen date/time
+            let triggerDate = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.time)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: triggerDate, repeats: false)
+            
             let request = UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger)
             
+            // Add the first notification
             UNUserNotificationCenter.current().add(request) { error in
                 if let error = error {
                     print("Error scheduling repeating notification: \(error.localizedDescription)")
                 } else {
-                    print("Repeating notification scheduled for \(reminder.title)")
+                    print("First notification scheduled for \(reminder.title) at \(reminder.time)")
+                }
+            }
+            
+            // Now, create repeating notifications starting 10 minutes after the selected time
+            var currentTriggerTime = reminder.time
+            let interval: TimeInterval = 600  // 600 seconds = 10 minutes
+            
+            // Schedule the repeating notifications
+            for i in 0..<10 {  // Schedule 10 repeating notifications, or as many as you need
+                currentTriggerTime = currentTriggerTime.addingTimeInterval(interval * Double(i))
+                
+                let repeatingTrigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: currentTriggerTime), repeats: false)
+                
+                let repeatingRequest = UNNotificationRequest(identifier: "\(reminder.id.uuidString)-\(i)", content: content, trigger: repeatingTrigger)
+                
+                // Add the repeating notifications
+                UNUserNotificationCenter.current().add(repeatingRequest) { error in
+                    if let error = error {
+                        print("Error scheduling repeating notifications: \(error.localizedDescription)")
+                    } else {
+                        print("Repeating notification scheduled for \(reminder.title) at \(currentTriggerTime)")
+                    }
                 }
             }
         } else {

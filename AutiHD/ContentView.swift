@@ -130,9 +130,10 @@ struct ContentView: View {
 struct Reminder: Identifiable {
     let id = UUID()
     var title: String
-    var description: String?  // Optional description
+    var description: String?
     var isCompleted: Bool
-    var time: Date  // New property to store the time for the reminder
+    var time: Date
+    var isRepeating: Bool  // New property to indicate if the reminder is recurring
 }
 
 struct AddReminderView: View {
@@ -142,6 +143,7 @@ struct AddReminderView: View {
     @State private var newReminderTitle: String = ""  // User input for the title
     @State private var newReminderDescription: String = ""  // User input for the description
     @State private var reminderTime: Date = Date()  // Time for the reminder
+    @State private var isRepeating: Bool = false  // New state to track the repeating option
     
     var body: some View {
         NavigationView {
@@ -170,24 +172,37 @@ struct AddReminderView: View {
                         .keyboardType(.default)  // Ensure keyboard
                 }
                 
-                // Reminder Time Picker
-                VStack(alignment: .leading) {
-                    Text("Set Reminder Time")
-                        .font(.headline)
-                    DatePicker("Select time", selection: $reminderTime, displayedComponents: [.hourAndMinute])
-                        .padding()
+                // Repeating Option
+                Toggle("Repeat every 10 minutes", isOn: $isRepeating)
+                    .padding()
+                
+                // Reminder Time Picker (with date and time when not repeating)
+                if !isRepeating {
+                    VStack(alignment: .leading) {
+                        Text("Set Reminder Date & Time")
+                            .font(.headline)
+                        DatePicker("Select date/time", selection: $reminderTime, displayedComponents: [.date, .hourAndMinute])
+                            .padding()
+                            .disabled(isRepeating)  // Disable the time picker if repeating
+                    }
+                } else {
+                    Text("Reminder will repeat every 10 minutes.")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                        .padding(.top, 5)
                 }
                 
                 // Save Reminder Button
                 Button(action: {
                     guard !newReminderTitle.isEmpty else { return }
                     
-                    // Create new reminder with title, description, and time
+                    // Create new reminder with title, description, time, and repeating option
                     let newReminder = Reminder(
                         title: newReminderTitle,
                         description: newReminderDescription.isEmpty ? nil : newReminderDescription, // Only save description if not empty
                         isCompleted: false,
-                        time: reminderTime
+                        time: reminderTime,
+                        isRepeating: isRepeating  // Pass the repeating option
                     )
                     reminders.append(newReminder)  // Append the new reminder to the list
                     scheduleNotification(for: newReminder)  // Schedule the notification
@@ -217,17 +232,31 @@ struct AddReminderView: View {
         content.body = reminder.description ?? "Don't forget your reminder!"
         content.sound = .default
         
-        // Set the trigger time based on the reminder's time
-        let triggerDate = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.time)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: triggerDate, repeats: false)
-        
-        let request = UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger)
-        
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("Error scheduling notification: \(error.localizedDescription)")
-            } else {
-                print("Notification scheduled for \(reminder.title) at \(reminder.time)")
+        if reminder.isRepeating {
+            // For repeating reminders, we need to set up a trigger to repeat every 10 minutes
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 600, repeats: true) // 600 seconds = 10 minutes
+            let request = UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger)
+            
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    print("Error scheduling repeating notification: \(error.localizedDescription)")
+                } else {
+                    print("Repeating notification scheduled for \(reminder.title)")
+                }
+            }
+        } else {
+            // For non-repeating reminders, set a one-time notification trigger
+            let triggerDate = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: reminder.time)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: triggerDate, repeats: false)
+            
+            let request = UNNotificationRequest(identifier: reminder.id.uuidString, content: content, trigger: trigger)
+            
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    print("Error scheduling notification: \(error.localizedDescription)")
+                } else {
+                    print("Notification scheduled for \(reminder.title) at \(reminder.time)")
+                }
             }
         }
     }
